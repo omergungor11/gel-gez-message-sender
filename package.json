@@ -1,0 +1,42 @@
+{
+  "name": "gelgezgor-trend-pipeline",
+  "version": "1.0.0",
+  "description": "GelGezGor Trend İlanları Pipeline - WhatsApp Bildirim & Sosyal Medya İçerik Üretici",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/panel/server.ts",
+    "start": "tsx src/panel/server.ts",
+    "scrape": "tsx src/scraper/trendScraper.ts",
+    "scrape:detail": "tsx src/scraper/detailScraper.ts",
+    "pipeline": "tsx src/pipeline/index.ts",
+    "pipeline:dry": "DRY_RUN=true tsx src/pipeline/index.ts",
+    "cron": "tsx src/cron/index.ts",
+    "generate:social": "tsx src/social/generator.ts",
+    "build:frontend": "cd src/panel/frontend && npx vite build"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "better-sqlite3": "^11.0.0",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.36.0",
+    "express": "^4.21.0",
+    "@google-cloud/vertexai": "^1.9.0",
+    "@google-cloud/aiplatform": "^3.0.0",
+    "node-cron": "^3.0.3",
+    "sharp": "^0.33.0",
+    "twilio": "^5.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/cors": "^2.8.0",
+    "@types/express": "^4.17.0",
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

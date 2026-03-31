@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/*.db
+output/
+.env
+service-account.json
+*.log

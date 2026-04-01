@@ -14,6 +14,11 @@ const envSchema = z.object({
   // Site
   BASE_URL: z.string().default('https://www.gelgezgor.com'),
 
+  // Supabase
+  SUPABASE_URL: z.string().default(''),
+  SUPABASE_ANON_KEY: z.string().default(''),
+  SUPABASE_DB_URL: z.string().default(''),
+
   // Meta Graph API
   META_ACCESS_TOKEN: z.string().default(''),
   INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().default(''),

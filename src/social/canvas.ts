@@ -1,16 +1,9 @@
 import sharp from 'sharp';
 import axios from 'axios';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import type { Trend } from '../db/schema.js';
 import type { TemplateTheme, TemplateName, TemplateVariant } from './templates/theme-system.js';
 import { autoSelectTemplate, getTemplate, getTemplateById } from './templates/theme-system.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUTPUT_DIR = path.resolve(__dirname, '../../output');
-
-if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+import { saveImage } from './storage.js';
 
 async function downloadImage(url: string): Promise<Buffer> {
   const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
@@ -191,10 +184,10 @@ export async function generateInstagramPost(trend: Trend, opts?: GenerateOptions
   }
 
   const filename = `ig_${trend.ilanId}_${t.id}_${Date.now()}.png`;
-  const outputPath = path.join(OUTPUT_DIR, filename);
-  await composite.png().toFile(outputPath);
+  const buffer = await composite.png().toBuffer();
+  const savedPath = await saveImage(buffer, filename);
   console.log(`[Canvas] IG post (${t.id}): ${filename}`);
-  return outputPath;
+  return savedPath;
 }
 
 export async function generateFacebookPost(trend: Trend, opts?: GenerateOptions): Promise<string> {
@@ -239,10 +232,10 @@ export async function generateFacebookPost(trend: Trend, opts?: GenerateOptions)
   }
 
   const filename = `fb_${trend.ilanId}_${t.id}_${Date.now()}.png`;
-  const outputPath = path.join(OUTPUT_DIR, filename);
-  await composite.png().toFile(outputPath);
+  const buffer = await composite.png().toBuffer();
+  const savedPath = await saveImage(buffer, filename);
   console.log(`[Canvas] FB post (${t.id}): ${filename}`);
-  return outputPath;
+  return savedPath;
 }
 
 export async function generatePanoramaGrid(trend: Trend, opts?: GenerateOptions): Promise<string[]> {
@@ -287,9 +280,9 @@ export async function generatePanoramaGrid(trend: Trend, opts?: GenerateOptions)
 
   for (let i = 0; i < 3; i++) {
     const filename = `panorama_${trend.ilanId}_${t.id}_${i + 1}_${Date.now()}.png`;
-    const outputPath = path.join(OUTPUT_DIR, filename);
-    await sharp(wideBuffer).extract({ left: i * PIECE_W, top: 0, width: PIECE_W, height: H }).toFile(outputPath);
-    pieces.push(outputPath);
+    const pieceBuffer = await sharp(wideBuffer).extract({ left: i * PIECE_W, top: 0, width: PIECE_W, height: H }).toBuffer();
+    const savedPath = await saveImage(pieceBuffer, filename);
+    pieces.push(savedPath);
   }
 
   console.log(`[Canvas] Panorama (${t.id}): 3 parça (ilan: ${trend.ilanId})`);

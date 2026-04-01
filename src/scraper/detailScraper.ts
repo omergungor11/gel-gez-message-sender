@@ -50,52 +50,58 @@ export async function scrapeListingDetail(url: string): Promise<ListingDetail> {
     whatsappNo = telefon.startsWith('+') ? telefon : `+90${telefon.replace(/^0/, '')}`;
   }
 
-  // Extract listing owner name
-  let ilanSahibi = '';
-  // Look for common patterns: "İlan Sahibi:", owner name near phone
-  $('*').each((_, el) => {
+  // Extract store/shop name from magaza link (h3 > a[href*="/magaza/"])
+  let magaza = '';
+  $('h3 > a[href*="/magaza/"]').each((_, el) => {
     const text = $(el).text().trim();
-    if (text.includes('İlan Sahibi') || text.includes('ilan sahibi')) {
-      // The name is usually the next sibling or inside the same container
-      const parent = $(el).parent();
-      const nameText = parent.text().replace(/İlan Sahibi:?/gi, '').trim();
-      if (nameText && nameText.length < 100) {
-        ilanSahibi = nameText.split('\n')[0].trim();
-        return false;
-      }
+    if (text && text.length < 100) {
+      magaza = text;
+      return false;
     }
   });
+  // Fallback: any link to /magaza/
+  if (!magaza) {
+    $('a[href*="/magaza/"]').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 2 && text.length < 100) {
+        magaza = text;
+        return false;
+      }
+    });
+  }
 
-  // Fallback: look for name near phone links
+  // Extract listing owner name from mobile contact bar (div.iletisim_bilgi)
+  let ilanSahibi = '';
+  const iletisimBilgi = $('div.iletisim_bilgi, .iletisim_bilgi').first().text().trim();
+  if (iletisimBilgi) {
+    // Format: "Ilan sahibi: Karibu Estates (Karibu Estates)"
+    const match = iletisimBilgi.match(/[İi]lan\s*sahibi\s*:\s*(.+?)(?:\s*\(|$)/i);
+    ilanSahibi = match ? match[1].trim() : iletisimBilgi.replace(/[İi]lan\s*sahibi\s*:?\s*/i, '').trim();
+  }
+
+  // Fallback: use store name as owner, or h3 inside contact panel
+  if (!ilanSahibi && magaza) {
+    ilanSahibi = magaza;
+  }
   if (!ilanSahibi) {
-    const phoneParent = $('a[href^="tel:"]').closest('div, section, aside');
-    const nameCandidate = phoneParent.find('h4, h5, strong, b').first().text().trim();
-    if (nameCandidate && nameCandidate.length < 80) {
-      ilanSahibi = nameCandidate;
+    const contactPanel = $('div.panel.iletisim, .iletisim');
+    const nameEl = contactPanel.find('h3').first();
+    const nameText = nameEl.text().trim();
+    if (nameText && nameText.length < 100) {
+      ilanSahibi = nameText;
     }
   }
 
-  // Extract shop/store name
-  let magaza = '';
-  $('a[href*="/magaza/"], a[href*="/store/"], a[href*="/shop/"]').each((_, el) => {
-    magaza = $(el).text().trim();
-    return false;
-  });
-
-  // Extract description
+  // Extract description from div.ilan_icerik
   let aciklama = '';
-  $('[class*="description"], [class*="aciklama"], [id*="description"]').each((_, el) => {
-    aciklama = $(el).text().trim().substring(0, 500);
-    return false;
-  });
+  const ilanIcerik = $('div.ilan_icerik, .ilan_icerik').first();
+  if (ilanIcerik.length) {
+    aciklama = ilanIcerik.text().trim().substring(0, 500);
+  }
   if (!aciklama) {
-    // Look for description-like blocks
-    $('p, .detail-text, .ilan-text').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length > 50 && text.length < 1000) {
-        aciklama = text.substring(0, 500);
-        return false;
-      }
+    $('[class*="description"], [class*="aciklama"]').each((_, el) => {
+      aciklama = $(el).text().trim().substring(0, 500);
+      return false;
     });
   }
 
@@ -149,21 +155,25 @@ export async function enrichTrendWithDetails(trendId: number): Promise<void> {
   }
 
   console.log(`[Detail] ${trend.baslik} detayları çekiliyor...`);
-  const detail = await scrapeListingDetail(trend.url);
+  try {
+    const detail = await scrapeListingDetail(trend.url);
 
-  db.update(schema.trends)
-    .set({
-      telefon: detail.telefon,
-      whatsappNo: detail.whatsappNo,
-      ilanSahibi: detail.ilanSahibi,
-      magaza: detail.magaza,
-      aciklama: detail.aciklama,
-      opiImages: JSON.stringify(detail.images),
-    })
-    .where(eq(schema.trends.id, trendId))
-    .run();
+    db.update(schema.trends)
+      .set({
+        telefon: detail.telefon,
+        whatsappNo: detail.whatsappNo,
+        ilanSahibi: detail.ilanSahibi,
+        magaza: detail.magaza,
+        aciklama: detail.aciklama,
+        opiImages: JSON.stringify(detail.images),
+      })
+      .where(eq(schema.trends.id, trendId))
+      .run();
 
-  console.log(`[Detail] Trend #${trendId} güncellendi: tel=${detail.telefon}, wa=${detail.whatsappNo}, ${detail.images.length} görsel`);
+    console.log(`[Detail] Trend #${trendId} güncellendi: tel=${detail.telefon}, wa=${detail.whatsappNo}, sahip=${detail.ilanSahibi}, ${detail.images.length} görsel`);
+  } catch (error: any) {
+    console.error(`[Detail] Trend #${trendId} hata: ${error.message}`);
+  }
 }
 
 export async function enrichAllTrends(trendIds: number[]): Promise<void> {

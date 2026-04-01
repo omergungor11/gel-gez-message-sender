@@ -77,4 +77,71 @@ router.get('/stats', (req, res) => {
   });
 });
 
+// GET /api/pipeline/report - Weekly report
+router.get('/report', (req, res) => {
+  const days = parseInt(req.query.days as string) || 7;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().split('T')[0];
+
+  // Total trends in period
+  const totalTrends = db.select({ count: sql<number>`count(*)` })
+    .from(schema.trends)
+    .where(sql`${schema.trends.tarih} >= ${sinceStr}`)
+    .get();
+
+  // Unique days with trends
+  const activeDays = db.select({ count: sql<number>`count(distinct ${schema.trends.tarih})` })
+    .from(schema.trends)
+    .where(sql`${schema.trends.tarih} >= ${sinceStr}`)
+    .get();
+
+  // WA stats in period
+  const waSent = db.select({ count: sql<number>`count(*)` })
+    .from(schema.trends)
+    .where(sql`${schema.trends.tarih} >= ${sinceStr} AND ${schema.trends.whatsappDurumu} = 'gonderildi'`)
+    .get();
+
+  // Social posts in period
+  const socialCount = db.select({ count: sql<number>`count(*)` })
+    .from(schema.socialPosts)
+    .where(sql`${schema.socialPosts.tarih} >= ${sinceStr}`)
+    .get();
+
+  // Top locations
+  const topLocations = db.select({
+    konum: schema.trends.konum,
+    count: sql<number>`count(*)`,
+  })
+    .from(schema.trends)
+    .where(sql`${schema.trends.tarih} >= ${sinceStr} AND ${schema.trends.konum} != ''`)
+    .groupBy(schema.trends.konum)
+    .orderBy(sql`count(*) desc`)
+    .limit(5)
+    .all();
+
+  // Daily breakdown
+  const dailyBreakdown = db.select({
+    tarih: schema.trends.tarih,
+    count: sql<number>`count(*)`,
+  })
+    .from(schema.trends)
+    .where(sql`${schema.trends.tarih} >= ${sinceStr}`)
+    .groupBy(schema.trends.tarih)
+    .orderBy(desc(schema.trends.tarih))
+    .all();
+
+  res.json({
+    period: { from: sinceStr, to: new Date().toISOString().split('T')[0], days },
+    summary: {
+      totalTrends: totalTrends?.count || 0,
+      activeDays: activeDays?.count || 0,
+      whatsappSent: waSent?.count || 0,
+      socialPosts: socialCount?.count || 0,
+    },
+    topLocations,
+    dailyBreakdown,
+  });
+});
+
 export default router;

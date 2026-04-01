@@ -16,6 +16,19 @@ async function downloadImage(url: string): Promise<Buffer> {
   return Buffer.from(response.data);
 }
 
+function parseImages(trend: Trend): string[] {
+  try {
+    return trend.opiImages ? JSON.parse(trend.opiImages) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getBestImageUrl(trend: Trend): string | undefined {
+  const images = parseImages(trend);
+  return images[0] || trend.imageUrl || undefined;
+}
+
 function wrapText(text: string, maxCharsPerLine: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
@@ -63,8 +76,7 @@ export async function generateInstagramPost(trend: Trend): Promise<string> {
 
   // Download listing image
   let imageBuffer: Buffer | null = null;
-  const images = trend.opiImages ? JSON.parse(trend.opiImages) : [];
-  const imageUrl = images[0] || trend.imageUrl;
+  const imageUrl = getBestImageUrl(trend);
   if (imageUrl) {
     try {
       imageBuffer = await downloadImage(imageUrl);
@@ -148,8 +160,7 @@ export async function generateFacebookPost(trend: Trend): Promise<string> {
   const konum = trend.konum || 'KKTC';
 
   let imageBuffer: Buffer | null = null;
-  const images = trend.opiImages ? JSON.parse(trend.opiImages) : [];
-  const imageUrl = images[0] || trend.imageUrl;
+  const imageUrl = getBestImageUrl(trend);
   if (imageUrl) {
     try {
       imageBuffer = await downloadImage(imageUrl);
@@ -221,8 +232,7 @@ export async function generatePanoramaGrid(trend: Trend): Promise<string[]> {
   const PIECE_W = 1080;
 
   let imageBuffer: Buffer | null = null;
-  const images = trend.opiImages ? JSON.parse(trend.opiImages) : [];
-  const imageUrl = images[0] || trend.imageUrl;
+  const imageUrl = getBestImageUrl(trend);
   if (imageUrl) {
     try {
       imageBuffer = await downloadImage(imageUrl);

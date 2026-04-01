@@ -20,7 +20,6 @@ app.use('/output', express.static(path.resolve(__dirname, '../../output')));
 app.use('/api/trends', trendsRouter);
 app.use('/api/social', socialRouter);
 app.use('/api/pipeline', pipelineRouter);
-app.get('/api/stats', pipelineRouter);
 
 // Serve frontend
 app.use(express.static(path.resolve(__dirname, 'frontend')));
@@ -34,7 +33,7 @@ const PORT = parseInt(config.PORT);
 app.listen(PORT, () => {
   console.log(`\n🚀 GelGezGor Trend Pipeline Panel`);
   console.log(`   http://localhost:${PORT}`);
-  console.log(`   API: http://localhost:${PORT}/api/stats`);
+  console.log(`   API: http://localhost:${PORT}/api/pipeline/stats`);
   console.log(`   DRY_RUN: ${config.DRY_RUN}\n`);
 });
 

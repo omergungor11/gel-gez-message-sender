@@ -381,7 +381,16 @@
           return;
         }
 
+        const bekleyenCount = data.trends.filter(t => t.whatsapp_durumu !== 'gonderildi').length;
+        const detaySizCount = data.trends.filter(t => !t.telefon).length;
+
         container.innerHTML = `
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="bulkEnrich()" ${detaySizCount === 0 ? 'disabled' : ''}>Tum Detaylari Cek (${detaySizCount})</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkWhatsApp()" ${bekleyenCount === 0 ? 'disabled' : ''}>Toplu WA Gonder (${bekleyenCount})</button>
+            <button class="btn btn-secondary btn-sm" onclick="bulkSocial()">Toplu Gorsel Uret</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">CSV Indir</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -390,8 +399,9 @@
                   <th>Baslik</th>
                   <th>Fiyat</th>
                   <th>Konum</th>
+                  <th>Ilan Sahibi</th>
                   <th>Telefon</th>
-                  <th>WhatsApp</th>
+                  <th>WA</th>
                   <th>Islemler</th>
                 </tr>
               </thead>
@@ -399,19 +409,25 @@
                 ${data.trends.map(t => `
                   <tr>
                     <td>${t.image_url ? `<img class="img-preview" src="${t.image_url}" alt="" onerror="this.style.display='none'">` : '-'}</td>
-                    <td><a href="${t.url}" target="_blank" style="color:var(--text);text-decoration:none;">${t.baslik}</a></td>
+                    <td>
+                      <a href="${t.url}" target="_blank" style="color:var(--text);text-decoration:none;">${t.baslik}</a>
+                    </td>
                     <td><strong>${t.fiyat || '-'}</strong></td>
                     <td>${t.konum || '-'}</td>
-                    <td>${t.telefon || '<span style="color:var(--text-muted)">-</span>'}</td>
+                    <td>
+                      ${t.ilan_sahibi ? `<strong>${t.ilan_sahibi}</strong>` : '<span style="color:var(--text-muted)">-</span>'}
+                      ${t.magaza ? `<br><span style="color:var(--text-muted);font-size:11px;">${t.magaza}</span>` : ''}
+                    </td>
+                    <td>${t.telefon ? `<a href="tel:${t.telefon}" style="color:var(--text);">${t.telefon}</a>` : '<span style="color:var(--text-muted)">-</span>'}</td>
                     <td>
                       <span class="badge ${t.whatsapp_durumu === 'gonderildi' ? 'badge-success' : t.whatsapp_durumu === 'hata' ? 'badge-error' : 'badge-warning'}">
                         ${t.whatsapp_durumu || 'bekliyor'}
                       </span>
                     </td>
                     <td>
-                      <button class="btn btn-secondary btn-sm" onclick="enrichTrend(${t.id})">Detay Cek</button>
-                      <button class="btn btn-primary btn-sm" onclick="sendWhatsApp(${t.id})">WA Gonder</button>
-                      <button class="btn btn-secondary btn-sm" onclick="generateSocial(${t.id})">Gorsel Uret</button>
+                      <button class="btn btn-secondary btn-sm" onclick="enrichTrend(${t.id})" ${t.telefon ? 'disabled' : ''}>Detay</button>
+                      <button class="btn btn-primary btn-sm" onclick="sendWhatsApp(${t.id})" ${t.whatsapp_durumu === 'gonderildi' ? 'disabled' : ''}>WA</button>
+                      <button class="btn btn-secondary btn-sm" onclick="generateSocial(${t.id})">Gorsel</button>
                     </td>
                   </tr>
                 `).join('')}
@@ -529,6 +545,82 @@
         showToast('Caption kopyalandi!', 'success');
       } catch (e) {
         showToast('Kopyalanamadi', 'error');
+      }
+    }
+
+    // Bulk Operations
+    async function bulkEnrich() {
+      showToast('Tum detaylar cekilyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const noDetail = data.trends.filter(t => !t.telefon);
+        for (const t of noDetail) {
+          await fetch(`${API}/api/trends/${t.id}/enrich`, { method: 'POST' });
+        }
+        showToast(`${noDetail.length} ilan detayi cekildi!`, 'success');
+        loadTab('trends');
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function bulkWhatsApp() {
+      if (!confirm('Tum bekleyen ilanlara WhatsApp mesaji gonderilecek. Devam?')) return;
+      showToast('Toplu WA gonderiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const pending = data.trends.filter(t => t.whatsapp_durumu !== 'gonderildi' && t.telefon);
+        let sent = 0;
+        for (const t of pending) {
+          const r = await fetch(`${API}/api/trends/${t.id}/whatsapp`, { method: 'POST' });
+          const d = await r.json();
+          if (d.success) sent++;
+        }
+        showToast(`${sent}/${pending.length} mesaj gonderildi!`, 'success');
+        loadTab('trends');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function bulkSocial() {
+      showToast('Toplu gorsel uretiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        for (const t of data.trends) {
+          await fetch(`${API}/api/trends/${t.id}/social`, { method: 'POST' });
+        }
+        showToast(`${data.trends.length} ilan icin gorsel uretildi!`, 'success');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function exportCSV() {
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const headers = ['ID', 'Baslik', 'Fiyat', 'Konum', 'Ilan Sahibi', 'Magaza', 'Telefon', 'WhatsApp', 'WA Durumu', 'URL'];
+        const rows = data.trends.map(t => [
+          t.ilan_id, `"${(t.baslik || '').replace(/"/g, '""')}"`, t.fiyat, `"${t.konum || ''}"`,
+          `"${t.ilan_sahibi || ''}"`, `"${t.magaza || ''}"`, t.telefon || '', t.whatsapp_no || '',
+          t.whatsapp_durumu || 'bekliyor', t.url
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `trend-ilanlar-${currentDate}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV indirildi!', 'success');
+      } catch (e) {
+        showToast('CSV hatasi: ' + e.message, 'error');
       }
     }
 

@@ -445,26 +445,50 @@
         const res = await fetch(`${API}/api/social/posts?date=${currentDate}`);
         const data = await res.json();
 
+        // Check Meta API status
+        let metaStatus = { instagram: false, facebook: false };
+        try {
+          const statusRes = await fetch(`${API}/api/social/status`);
+          metaStatus = await statusRes.json();
+        } catch {}
+
         if (data.posts.length === 0) {
           container.innerHTML = '<div class="loading"><p>Bu tarih icin sosyal medya icerigi bulunamadi.</p></div>';
           return;
         }
 
+        const publishedCount = data.posts.filter(p => p.durumu === 'paylasildi').length;
+
         container.innerHTML = `
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary btn-sm" onclick="publishAllSocial()" ${!metaStatus.instagram && !metaStatus.facebook ? 'disabled' : ''}>
+              Toplu Paylas (IG+FB)
+            </button>
+            <span style="color:var(--text-muted);font-size:12px;">
+              IG: ${metaStatus.instagram ? '<span style="color:var(--success);">Bagli</span>' : '<span style="color:var(--accent);">Baglanmadi</span>'}
+              | FB: ${metaStatus.facebook ? '<span style="color:var(--success);">Bagli</span>' : '<span style="color:var(--accent);">Baglanmadi</span>'}
+              | Paylasilan: ${publishedCount}/${data.posts.length}
+            </span>
+          </div>
           <div class="social-grid">
             ${data.posts.map(p => {
               const isImage = p.gorsel_path && !p.gorsel_path.startsWith('[');
               const filename = isImage ? p.gorsel_path.split('/').pop() : '';
+              const isPublished = p.durumu === 'paylasildi';
               return `
                 <div class="social-card ${p.platform === 'facebook' ? 'fb' : ''}">
                   ${isImage ? `<img src="/output/${filename}" alt="" onerror="this.style.display='none'">` : ''}
                   <div class="social-card-body">
-                    <div class="platform">${p.platform} / ${p.post_type}</div>
+                    <div class="platform">
+                      ${p.platform} / ${p.post_type}
+                      ${isPublished ? ' <span class="badge badge-success">Paylasild</span>' : ''}
+                    </div>
                     <div class="caption">${(p.caption || '').substring(0, 200)}</div>
                   </div>
                   <div class="social-card-actions">
-                    ${isImage ? `<a class="btn btn-sm btn-primary" href="/output/${filename}" download>Indir</a>` : ''}
-                    <button class="btn btn-sm btn-secondary" onclick="copyCaption(${p.id})">Caption Kopyala</button>
+                    ${isImage ? `<a class="btn btn-sm btn-secondary" href="/output/${filename}" download>Indir</a>` : ''}
+                    <button class="btn btn-sm btn-secondary" onclick="copyCaption(${p.id})">Caption</button>
+                    ${p.trend_id && !isPublished ? `<button class="btn btn-sm btn-primary" onclick="publishSingle(${p.trend_id})">Paylas</button>` : ''}
                   </div>
                 </div>
               `;
@@ -621,6 +645,38 @@
         showToast('CSV indirildi!', 'success');
       } catch (e) {
         showToast('CSV hatasi: ' + e.message, 'error');
+      }
+    }
+
+    // Social Media Publishing
+    async function publishSingle(trendId) {
+      showToast('Instagram + Facebook\'a paylasiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/social/publish/${trendId}`, { method: 'POST' });
+        const data = await res.json();
+        const ok = data.results?.filter(r => r.success).length || 0;
+        const fail = data.results?.filter(r => !r.success).length || 0;
+        showToast(`Paylasim: ${ok} basarili, ${fail} basarisiz`, ok > 0 ? 'success' : 'error');
+        loadTab('social');
+      } catch (e) {
+        showToast('Paylasim hatasi: ' + e.message, 'error');
+      }
+    }
+
+    async function publishAllSocial() {
+      if (!confirm('Tum icerikler Instagram ve Facebook\'a paylasilacak. Devam?')) return;
+      showToast('Toplu paylasim baslatildi...', 'success');
+      try {
+        const res = await fetch(`${API}/api/social/publish-all`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: currentDate }),
+        });
+        const data = await res.json();
+        showToast(`Toplu paylasim: ${data.summary.published} basarili, ${data.summary.failed} basarisiz`, 'success');
+        loadTab('social');
+      } catch (e) {
+        showToast('Toplu paylasim hatasi: ' + e.message, 'error');
       }
     }
 

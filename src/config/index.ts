@@ -14,6 +14,13 @@ const envSchema = z.object({
   // Site
   BASE_URL: z.string().default('https://www.gelgezgor.com'),
 
+  // Meta Graph API
+  META_ACCESS_TOKEN: z.string().default(''),
+  INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().default(''),
+  FACEBOOK_PAGE_ID: z.string().default(''),
+  FACEBOOK_PAGE_ACCESS_TOKEN: z.string().default(''),
+  PUBLIC_BASE_URL: z.string().default(''),
+
   // Pipeline
   CRON_SCHEDULE: z.string().default('0 9,15 * * *'),
   DRY_RUN: z.string().default('true'),

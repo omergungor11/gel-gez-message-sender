@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { db, schema } from '../../db/index.js';
 import { eq, desc } from 'drizzle-orm';
+import { publishTrendToSocial, publishAllTrends } from '../../social/publisher/index.js';
+import { isMetaConfigured, isFacebookConfigured } from '../../social/publisher/meta-client.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -43,6 +45,49 @@ router.get('/image/:filename', (req, res) => {
   }
 
   res.sendFile(filePath);
+});
+
+// GET /api/social/status - Check Meta API configuration status
+router.get('/status', (req, res) => {
+  res.json({
+    instagram: isMetaConfigured(),
+    facebook: isFacebookConfigured(),
+  });
+});
+
+// POST /api/social/publish/:trendId - Publish trend to Instagram + Facebook
+router.post('/publish/:trendId', async (req, res) => {
+  try {
+    const trendId = parseInt(req.params.trendId);
+    const results = await publishTrendToSocial(trendId);
+    const allSuccess = results.every(r => r.success);
+    res.json({ success: allSuccess, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/social/publish-all - Publish all trends for a date
+router.post('/publish-all', async (req, res) => {
+  try {
+    const date = (req.body.date as string) || new Date().toISOString().split('T')[0];
+    const resultsMap = await publishAllTrends(date);
+    const summary = {
+      total: resultsMap.size,
+      published: 0,
+      failed: 0,
+      results: [] as any[],
+    };
+    for (const [trendId, results] of resultsMap) {
+      const success = results.some(r => r.success);
+      if (success) summary.published++;
+      else summary.failed++;
+      summary.results.push({ trendId, results });
+    }
+    res.json({ success: true, summary });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

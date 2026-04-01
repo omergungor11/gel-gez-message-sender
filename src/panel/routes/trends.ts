@@ -4,6 +4,7 @@ import { eq, desc, and, sql } from 'drizzle-orm';
 import { enrichTrendWithDetails } from '../../scraper/detailScraper.js';
 import { sendTrendNotification } from '../../whatsapp/sender.js';
 import { generateSocialContent } from '../../social/generator.js';
+import { getAllTemplateIds, TEMPLATES } from '../../social/templates/theme-system.js';
 
 const router = Router();
 
@@ -73,12 +74,32 @@ router.post('/:id/social', async (req, res) => {
 
   if (!trend) return res.status(404).json({ error: 'Trend bulunamadı' });
 
+  // Accept optional templateId from request body
+  const templateId = req.body?.templateId as string | undefined;
+
   try {
-    const content = await generateSocialContent(trend);
+    const content = await generateSocialContent(trend, templateId ? { templateId } : undefined);
     res.json({ success: true, content });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// GET /api/trends/templates/list - Get available templates
+router.get('/templates/list', (req, res) => {
+  const templates = getAllTemplateIds().map(id => {
+    const t = TEMPLATES[id];
+    return {
+      id: t.id,
+      name: t.name,
+      variant: t.variant,
+      accent: t.accent,
+      bgPrimary: t.bgPrimary,
+      badgeStyle: t.badgeStyle,
+      priceStyle: t.priceStyle,
+    };
+  });
+  res.json({ templates });
 });
 
 export default router;

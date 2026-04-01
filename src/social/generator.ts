@@ -1,9 +1,11 @@
 import { db, schema } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { generateInstagramPost, generateFacebookPost, generatePanoramaGrid } from './canvas.js';
+import type { GenerateOptions } from './canvas.js';
 import { generateCaptionWithGemini, generateImagenPrompt, generateImageWithImagen } from './gemini.js';
 import { generateInstagramCaption } from './templates/instagram.js';
 import { generateFacebookCaption } from './templates/facebook.js';
+import { autoSelectTemplate, resetTemplateRotation } from './templates/theme-system.js';
 import type { Trend, NewSocialPost } from '../db/schema.js';
 import sharp from 'sharp';
 import path from 'path';
@@ -22,10 +24,21 @@ export interface GeneratedContent {
   facebookCaption: string;
   facebookHashtags: string;
   imagenUsed: boolean;
+  templateId: string;       // which template was used
 }
 
-export async function generateSocialContent(trend: Trend): Promise<GeneratedContent> {
-  console.log(`[Generator] İçerik üretiliyor: ${trend.baslik}`);
+export async function generateSocialContent(
+  trend: Trend,
+  opts?: GenerateOptions,
+): Promise<GeneratedContent> {
+  // Determine template (auto or manual override)
+  const { getTemplateById } = await import('./templates/theme-system.js');
+  const theme = opts?.templateId
+    ? (getTemplateById(opts.templateId) || autoSelectTemplate(trend.baslik))
+    : autoSelectTemplate(trend.baslik);
+  const templateOpts: GenerateOptions = { templateId: theme.id };
+
+  console.log(`[Generator] İçerik üretiliyor: ${trend.baslik} [${theme.id}]`);
 
   // 1. Generate captions (try Gemini first, fallback to templates)
   let igCaption: { caption: string; hashtags: string };
@@ -41,24 +54,23 @@ export async function generateSocialContent(trend: Trend): Promise<GeneratedCont
     fbCaption = generateFacebookCaption(trend);
   }
 
-  // 2. Try Imagen 3 for AI-generated background, then overlay with sharp
+  // 2. Try Imagen 3 for AI-generated background
   let imagenUsed = false;
   const imagenPrompt = await generateImagenPrompt(trend);
   const aiImage = await generateImageWithImagen(imagenPrompt, '1:1');
 
   if (aiImage) {
-    // Save AI image as background option
     const aiPath = path.join(OUTPUT_DIR, `ai_bg_${trend.ilanId}_${Date.now()}.png`);
     await sharp(aiImage).resize(1080, 1080).toFile(aiPath);
     imagenUsed = true;
     console.log(`[Generator] Imagen 3 görseli üretildi: ${aiPath}`);
   }
 
-  // 3. Generate visual posts with canvas (using listing images or AI background)
+  // 3. Generate visual posts with template-aware canvas
   const [instagramPost, facebookPost, panoramaGrid] = await Promise.all([
-    generateInstagramPost(trend),
-    generateFacebookPost(trend),
-    generatePanoramaGrid(trend),
+    generateInstagramPost(trend, templateOpts),
+    generateFacebookPost(trend, templateOpts),
+    generatePanoramaGrid(trend, templateOpts),
   ]);
 
   // 4. Save to database
@@ -103,7 +115,7 @@ export async function generateSocialContent(trend: Trend): Promise<GeneratedCont
   db.insert(schema.socialPosts).values(fbPost).run();
   db.insert(schema.socialPosts).values(panoramaPost).run();
 
-  console.log(`[Generator] İçerik tamamlandı: IG + FB + Panorama (ilan: ${trend.ilanId})`);
+  console.log(`[Generator] İçerik tamamlandı: IG + FB + Panorama [${theme.id}] (ilan: ${trend.ilanId})`);
 
   return {
     instagramPost,
@@ -114,10 +126,12 @@ export async function generateSocialContent(trend: Trend): Promise<GeneratedCont
     facebookCaption: fbCaption.caption,
     facebookHashtags: fbCaption.hashtags,
     imagenUsed,
+    templateId: theme.id,
   };
 }
 
-export async function generateAllSocialContent(trendIds: number[]): Promise<Map<number, GeneratedContent>> {
+export async function generateAllSocialContent(trendIds: number[], opts?: GenerateOptions): Promise<Map<number, GeneratedContent>> {
+  resetTemplateRotation(); // Start fresh rotation for each batch
   const results = new Map<number, GeneratedContent>();
 
   for (const id of trendIds) {
@@ -125,7 +139,7 @@ export async function generateAllSocialContent(trendIds: number[]): Promise<Map<
     if (!trend) continue;
 
     try {
-      const content = await generateSocialContent(trend);
+      const content = await generateSocialContent(trend, opts);
       results.set(id, content);
     } catch (error: any) {
       console.error(`[Generator] Trend #${id} içerik hatası:`, error.message);

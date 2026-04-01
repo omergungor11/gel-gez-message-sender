@@ -5,3 +5,5 @@ output/
 .env
 service-account.json
 *.log
+.vercel
+.env*.local

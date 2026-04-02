@@ -1,8 +1,7 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/output/(.*)", "destination": "/api/image?file=$1" },
-    { "source": "/((?!api/).*)", "destination": "/src/panel/frontend/index.html" }
+    { "source": "/output/(.*)", "destination": "/api/image?file=$1" }
   ],
   "crons": [
     {

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GelGezGor Trend Pipeline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #3f475f;
+      --accent: #e74c3c;
+      --bg: #0f1117;
+      --card: #1a1d27;
+      --card-hover: #22263a;
+      --text: #e4e6eb;
+      --text-muted: #8b8fa3;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --border: #2a2d3a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Ubuntu', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--primary), #2c3e50);
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid var(--accent);
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .header h1 span { color: var(--accent); }
+    .header-actions { display: flex; gap: 12px; }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #c0392b; }
+    .btn-secondary { background: var(--primary); color: white; }
+    .btn-secondary:hover { background: #4a5270; }
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Layout */
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Stats Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+    .stat-card .label { color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
+    .stat-card .value { font-size: 32px; font-weight: 700; }
+    .stat-card .value.accent { color: var(--accent); }
+    .stat-card .value.success { color: var(--success); }
+    .stat-card .value.warning { color: var(--warning); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0;
+    }
+    .tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover { color: var(--text); }
+
+    /* Table */
+    .table-wrap {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: rgba(63,71,95,0.3);
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+    }
+    tr:hover td { background: var(--card-hover); }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-success { background: rgba(39,174,96,0.15); color: var(--success); }
+    .badge-warning { background: rgba(243,156,18,0.15); color: var(--warning); }
+    .badge-error { background: rgba(231,76,60,0.15); color: var(--accent); }
+
+    /* Image Preview */
+    .img-preview {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    /* Social Content Grid */
+    .social-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .social-card {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+    .social-card:hover { transform: translateY(-2px); }
+    .social-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+    }
+    .social-card.fb img { aspect-ratio: 1200/630; }
+    .social-card-body { padding: 16px; }
+    .social-card-body .platform {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .social-card-body .caption {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      max-height: 80px;
+      overflow: hidden;
+    }
+    .social-card-actions {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Logs */
+    .log-entry {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .log-entry .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-width: 160px;
+    }
+    .log-entry .action {
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 80px;
+    }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+    .spinner {
+      display: inline-block;
+      width: 30px; height: 30px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 14px 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    .toast.success { border-left: 4px solid var(--success); }
+    .toast.error { border-left: 4px solid var(--accent); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* Date picker */
+    input[type="date"] {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <h1>GelGezGor <span>Trend Pipeline</span></h1>
+      <div class="header-actions">
+        <input type="date" id="dateFilter" />
+        <button class="btn btn-primary" id="runPipeline">
+          ▶ Pipeline Calistir
+        </button>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="label">Bugunun Trend Ilanlari</div>
+          <div class="value accent" id="statTrends">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">WhatsApp Gonderildi</div>
+          <div class="value success" id="statWhatsapp">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Sosyal Medya Icerigi</div>
+          <div class="value warning" id="statSocial">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Toplam Ilan</div>
+          <div class="value" id="statTotal">-</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="trends">Trend Ilanlar</button>
+        <button class="tab" data-tab="social">Sosyal Medya</button>
+        <button class="tab" data-tab="logs">Pipeline Loglar</button>
+      </div>
+
+      <!-- Tab Content -->
+      <div id="tabContent">
+        <div class="loading"><div class="spinner"></div><p>Yukleniyor...</p></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" style="display:none;"></div>
+  </div>
+
+  <script>
+    const API = '';
+    let currentTab = 'trends';
+    let currentDate = new Date().toISOString().split('T')[0];
+
+    // Init
+    document.getElementById('dateFilter').value = currentDate;
+    loadStats();
+    loadTab('trends');
+
+    // Event Listeners
+    document.getElementById('dateFilter').addEventListener('change', (e) => {
+      currentDate = e.target.value;
+      loadStats();
+      loadTab(currentTab);
+    });
+
+    document.getElementById('runPipeline').addEventListener('click', async () => {
+      const btn = document.getElementById('runPipeline');
+      btn.disabled = true;
+      btn.textContent = '⏳ Calisiyor...';
+      try {
+        const res = await fetch(`${API}/api/pipeline/run`, { method: 'POST' });
+        const data = await res.json();
+        showToast(`Pipeline tamamlandi! ${data.result.trendsFound} trend, ${data.result.whatsappSent} WA`, 'success');
+        loadStats();
+        loadTab(currentTab);
+      } catch (e) {
+        showToast('Pipeline hatasi: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ Pipeline Calistir';
+      }
+    });
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        loadTab(currentTab);
+      });
+    });
+
+    // Load Stats
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API}/api/pipeline/stats`);
+        const data = await res.json();
+        document.getElementById('statTrends').textContent = data.trends.today;
+        document.getElementById('statWhatsapp').textContent = data.whatsapp.sent;
+        document.getElementById('statSocial').textContent = data.social.today;
+        document.getElementById('statTotal').textContent = data.trends.total;
+      } catch (e) {
+        console.error('Stats load error:', e);
+      }
+    }
+
+    // Load Tab Content
+    async function loadTab(tab) {
+      const container = document.getElementById('tabContent');
+      container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+
+      if (tab === 'trends') await loadTrends(container);
+      else if (tab === 'social') await loadSocial(container);
+      else if (tab === 'logs') await loadLogs(container);
+    }
+
+    async function loadTrends(container) {
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+
+        if (data.trends.length === 0) {
+          container.innerHTML = '<div class="loading"><p>Bu tarih icin trend ilan bulunamadi.</p></div>';
+          return;
+        }
+
+        const bekleyenCount = data.trends.filter(t => t.whatsapp_durumu !== 'gonderildi').length;
+        const detaySizCount = data.trends.filter(t => !t.telefon).length;
+
+        container.innerHTML = `
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="bulkEnrich()" ${detaySizCount === 0 ? 'disabled' : ''}>Tum Detaylari Cek (${detaySizCount})</button>
+            <button class="btn btn-primary btn-sm" onclick="bulkWhatsApp()" ${bekleyenCount === 0 ? 'disabled' : ''}>Toplu WA Gonder (${bekleyenCount})</button>
+            <button class="btn btn-secondary btn-sm" onclick="bulkSocial()">Toplu Gorsel Uret</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">CSV Indir</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Gorsel</th>
+                  <th>Baslik</th>
+                  <th>Fiyat</th>
+                  <th>Konum</th>
+                  <th>Ilan Sahibi</th>
+                  <th>Telefon</th>
+                  <th>WA</th>
+                  <th>Islemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.trends.map(t => `
+                  <tr>
+                    <td>${t.image_url ? `<img class="img-preview" src="${t.image_url}" alt="" onerror="this.style.display='none'">` : '-'}</td>
+                    <td>
+                      <a href="${t.url}" target="_blank" style="color:var(--text);text-decoration:none;">${t.baslik}</a>
+                    </td>
+                    <td><strong>${t.fiyat || '-'}</strong></td>
+                    <td>${t.konum || '-'}</td>
+                    <td>
+                      ${t.ilan_sahibi ? `<strong>${t.ilan_sahibi}</strong>` : '<span style="color:var(--text-muted)">-</span>'}
+                      ${t.magaza ? `<br><span style="color:var(--text-muted);font-size:11px;">${t.magaza}</span>` : ''}
+                    </td>
+                    <td>${t.telefon ? `<a href="tel:${t.telefon}" style="color:var(--text);">${t.telefon}</a>` : '<span style="color:var(--text-muted)">-</span>'}</td>
+                    <td>
+                      <span class="badge ${t.whatsapp_durumu === 'gonderildi' ? 'badge-success' : t.whatsapp_durumu === 'hata' ? 'badge-error' : 'badge-warning'}">
+                        ${t.whatsapp_durumu || 'bekliyor'}
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-secondary btn-sm" onclick="enrichTrend(${t.id})" ${t.telefon ? 'disabled' : ''}>Detay</button>
+                      <button class="btn btn-primary btn-sm" onclick="sendWhatsApp(${t.id})" ${t.whatsapp_durumu === 'gonderildi' ? 'disabled' : ''}>WA</button>
+                      <button class="btn btn-secondary btn-sm" onclick="generateSocial(${t.id})">Gorsel</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (e) {
+        container.innerHTML = `<div class="loading"><p>Hata: ${e.message}</p></div>`;
+      }
+    }
+
+    async function loadSocial(container) {
+      try {
+        const res = await fetch(`${API}/api/social/posts?date=${currentDate}`);
+        const data = await res.json();
+
+        // Check Meta API status
+        let metaStatus = { instagram: false, facebook: false };
+        try {
+          const statusRes = await fetch(`${API}/api/social/status`);
+          metaStatus = await statusRes.json();
+        } catch {}
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div class="loading"><p>Bu tarih icin sosyal medya icerigi bulunamadi.</p></div>';
+          return;
+        }
+
+        const publishedCount = data.posts.filter(p => p.durumu === 'paylasildi').length;
+
+        container.innerHTML = `
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary btn-sm" onclick="publishAllSocial()" ${!metaStatus.instagram && !metaStatus.facebook ? 'disabled' : ''}>
+              Toplu Paylas (IG+FB)
+            </button>
+            <span style="color:var(--text-muted);font-size:12px;">
+              IG: ${metaStatus.instagram ? '<span style="color:var(--success);">Bagli</span>' : '<span style="color:var(--accent);">Baglanmadi</span>'}
+              | FB: ${metaStatus.facebook ? '<span style="color:var(--success);">Bagli</span>' : '<span style="color:var(--accent);">Baglanmadi</span>'}
+              | Paylasilan: ${publishedCount}/${data.posts.length}
+            </span>
+          </div>
+          <div class="social-grid">
+            ${data.posts.map(p => {
+              const isImage = p.gorsel_path && !p.gorsel_path.startsWith('[');
+              const filename = isImage ? p.gorsel_path.split('/').pop() : '';
+              const isPublished = p.durumu === 'paylasildi';
+              return `
+                <div class="social-card ${p.platform === 'facebook' ? 'fb' : ''}">
+                  ${isImage ? `<img src="/output/${filename}" alt="" onerror="this.style.display='none'">` : ''}
+                  <div class="social-card-body">
+                    <div class="platform">
+                      ${p.platform} / ${p.post_type}
+                      ${isPublished ? ' <span class="badge badge-success">Paylasild</span>' : ''}
+                    </div>
+                    <div class="caption">${(p.caption || '').substring(0, 200)}</div>
+                  </div>
+                  <div class="social-card-actions">
+                    ${isImage ? `<a class="btn btn-sm btn-secondary" href="/output/${filename}" download>Indir</a>` : ''}
+                    <button class="btn btn-sm btn-secondary" onclick="copyCaption(${p.id})">Caption</button>
+                    ${p.trend_id && !isPublished ? `<button class="btn btn-sm btn-primary" onclick="publishSingle(${p.trend_id})">Paylas</button>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } catch (e) {
+        container.innerHTML = `<div class="loading"><p>Hata: ${e.message}</p></div>`;
+      }
+    }
+
+    async function loadLogs(container) {
+      try {
+        const res = await fetch(`${API}/api/pipeline/logs?limit=50`);
+        const data = await res.json();
+
+        if (data.logs.length === 0) {
+          container.innerHTML = '<div class="loading"><p>Henuz pipeline log yok.</p></div>';
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="table-wrap">
+            ${data.logs.map(l => `
+              <div class="log-entry">
+                <span class="time">${new Date(l.created_at).toLocaleString('tr-TR')}</span>
+                <span class="action"><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-error'}">${l.action}</span></span>
+                <span>${l.message}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (e) {
+        container.innerHTML = `<div class="loading"><p>Hata: ${e.message}</p></div>`;
+      }
+    }
+
+    // Actions
+    async function enrichTrend(id) {
+      try {
+        await fetch(`${API}/api/trends/${id}/enrich`, { method: 'POST' });
+        showToast('Detaylar cekildi!', 'success');
+        loadTab('trends');
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function sendWhatsApp(id) {
+      try {
+        const res = await fetch(`${API}/api/trends/${id}/whatsapp`, { method: 'POST' });
+        const data = await res.json();
+        showToast(data.success ? 'WhatsApp gonderildi!' : 'Gonderilemedi: ' + data.error, data.success ? 'success' : 'error');
+        loadTab('trends');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function generateSocial(id) {
+      showToast('Gorsel uretiliyor, lutfen bekleyin...', 'success');
+      try {
+        await fetch(`${API}/api/trends/${id}/social`, { method: 'POST' });
+        showToast('Sosyal medya icerigi uretildi!', 'success');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function copyCaption(id) {
+      try {
+        const res = await fetch(`${API}/api/social/posts/${id}`);
+        const post = await res.json();
+        const text = (post.caption || '') + '\n\n' + (post.hashtags || '');
+        await navigator.clipboard.writeText(text);
+        showToast('Caption kopyalandi!', 'success');
+      } catch (e) {
+        showToast('Kopyalanamadi', 'error');
+      }
+    }
+
+    // Bulk Operations
+    async function bulkEnrich() {
+      showToast('Tum detaylar cekilyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const noDetail = data.trends.filter(t => !t.telefon);
+        for (const t of noDetail) {
+          await fetch(`${API}/api/trends/${t.id}/enrich`, { method: 'POST' });
+        }
+        showToast(`${noDetail.length} ilan detayi cekildi!`, 'success');
+        loadTab('trends');
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function bulkWhatsApp() {
+      if (!confirm('Tum bekleyen ilanlara WhatsApp mesaji gonderilecek. Devam?')) return;
+      showToast('Toplu WA gonderiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const pending = data.trends.filter(t => t.whatsapp_durumu !== 'gonderildi' && t.telefon);
+        let sent = 0;
+        for (const t of pending) {
+          const r = await fetch(`${API}/api/trends/${t.id}/whatsapp`, { method: 'POST' });
+          const d = await r.json();
+          if (d.success) sent++;
+        }
+        showToast(`${sent}/${pending.length} mesaj gonderildi!`, 'success');
+        loadTab('trends');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function bulkSocial() {
+      showToast('Toplu gorsel uretiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        for (const t of data.trends) {
+          await fetch(`${API}/api/trends/${t.id}/social`, { method: 'POST' });
+        }
+        showToast(`${data.trends.length} ilan icin gorsel uretildi!`, 'success');
+        loadStats();
+      } catch (e) {
+        showToast('Hata: ' + e.message, 'error');
+      }
+    }
+
+    async function exportCSV() {
+      try {
+        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const data = await res.json();
+        const headers = ['ID', 'Baslik', 'Fiyat', 'Konum', 'Ilan Sahibi', 'Magaza', 'Telefon', 'WhatsApp', 'WA Durumu', 'URL'];
+        const rows = data.trends.map(t => [
+          t.ilan_id, `"${(t.baslik || '').replace(/"/g, '""')}"`, t.fiyat, `"${t.konum || ''}"`,
+          `"${t.ilan_sahibi || ''}"`, `"${t.magaza || ''}"`, t.telefon || '', t.whatsapp_no || '',
+          t.whatsapp_durumu || 'bekliyor', t.url
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `trend-ilanlar-${currentDate}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV indirildi!', 'success');
+      } catch (e) {
+        showToast('CSV hatasi: ' + e.message, 'error');
+      }
+    }
+
+    // Social Media Publishing
+    async function publishSingle(trendId) {
+      showToast('Instagram + Facebook\'a paylasiliyor...', 'success');
+      try {
+        const res = await fetch(`${API}/api/social/publish/${trendId}`, { method: 'POST' });
+        const data = await res.json();
+        const ok = data.results?.filter(r => r.success).length || 0;
+        const fail = data.results?.filter(r => !r.success).length || 0;
+        showToast(`Paylasim: ${ok} basarili, ${fail} basarisiz`, ok > 0 ? 'success' : 'error');
+        loadTab('social');
+      } catch (e) {
+        showToast('Paylasim hatasi: ' + e.message, 'error');
+      }
+    }
+
+    async function publishAllSocial() {
+      if (!confirm('Tum icerikler Instagram ve Facebook\'a paylasilacak. Devam?')) return;
+      showToast('Toplu paylasim baslatildi...', 'success');
+      try {
+        const res = await fetch(`${API}/api/social/publish-all`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: currentDate }),
+        });
+        const data = await res.json();
+        showToast(`Toplu paylasim: ${data.summary.published} basarili, ${data.summary.failed} basarisiz`, 'success');
+        loadTab('social');
+      } catch (e) {
+        showToast('Toplu paylasim hatasi: ' + e.message, 'error');
+      }
+    }
+
+    function showToast(msg, type) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `toast ${type}`;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+  </script>
+</body>
+</html>

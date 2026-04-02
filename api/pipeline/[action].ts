@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../src/db/supabase.js';
-import { scrapeTrendListings } from '../../src/scraper/trendScraper.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query.action as string;
 
   try {
+    const { db } = await import('../../src/db/supabase.js');
+
     if (action === 'stats') {
       const stats = await db.getStats();
       return res.json(stats);
@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'run' && req.method === 'POST') {
+      const { scrapeTrendListings } = await import('../../src/scraper/trendScraper.js');
       const today = new Date().toISOString().split('T')[0];
       const listings = await scrapeTrendListings();
       let saved = 0;

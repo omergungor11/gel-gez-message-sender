@@ -1,5 +1,7 @@
-import 'dotenv/config';
 import { z } from 'zod';
+
+// dotenv: Vercel provides env vars automatically, dotenv only needed locally
+try { await import('dotenv/config'); } catch {}
 
 const envSchema = z.object({
   // Twilio

@@ -1,8 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { config } from '../config/index.js';
-import { db, schema } from '../db/index.js';
-import { eq } from 'drizzle-orm';
 
 export interface ListingDetail {
   telefon: string;
@@ -142,33 +140,56 @@ export async function scrapeListingDetail(url: string): Promise<ListingDetail> {
 }
 
 export async function enrichTrendWithDetails(trendId: number): Promise<void> {
-  const trend = db.select().from(schema.trends).where(eq(schema.trends.id, trendId)).get();
+  const isVercel = !!process.env.VERCEL;
+  let trend: any;
+
+  if (isVercel) {
+    const { db } = await import('../db/supabase.js');
+    trend = await db.getTrendById(trendId);
+  } else {
+    const { db, schema } = await import('../db/index.js');
+    const { eq } = await import('drizzle-orm');
+    trend = db.select().from(schema.trends).where(eq(schema.trends.id, trendId)).get();
+  }
+
   if (!trend) {
     console.log(`[Detail] Trend #${trendId} bulunamadı`);
     return;
   }
 
-  // Skip if already enriched
   if (trend.telefon) {
     console.log(`[Detail] Trend #${trendId} zaten zenginleştirilmiş, atlanıyor`);
     return;
   }
 
-  console.log(`[Detail] ${trend.baslik} detayları çekiliyor...`);
+  console.log(`[Detail] ${trend.baslik || trend.baslik} detayları çekiliyor...`);
   try {
     const detail = await scrapeListingDetail(trend.url);
 
-    db.update(schema.trends)
-      .set({
+    const updateData = {
+      telefon: detail.telefon,
+      whatsapp_no: detail.whatsappNo,
+      ilan_sahibi: detail.ilanSahibi,
+      magaza: detail.magaza,
+      aciklama: detail.aciklama,
+      opi_images: JSON.stringify(detail.images),
+    };
+
+    if (isVercel) {
+      const { db } = await import('../db/supabase.js');
+      await db.updateTrend(trendId, updateData);
+    } else {
+      const { db, schema } = await import('../db/index.js');
+      const { eq } = await import('drizzle-orm');
+      db.update(schema.trends).set({
         telefon: detail.telefon,
         whatsappNo: detail.whatsappNo,
         ilanSahibi: detail.ilanSahibi,
         magaza: detail.magaza,
         aciklama: detail.aciklama,
         opiImages: JSON.stringify(detail.images),
-      })
-      .where(eq(schema.trends.id, trendId))
-      .run();
+      }).where(eq(schema.trends.id, trendId)).run();
+    }
 
     console.log(`[Detail] Trend #${trendId} güncellendi: tel=${detail.telefon}, wa=${detail.whatsappNo}, sahip=${detail.ilanSahibi}, ${detail.images.length} görsel`);
   } catch (error: any) {

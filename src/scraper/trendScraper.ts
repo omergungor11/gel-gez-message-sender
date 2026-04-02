@@ -1,8 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { config } from '../config/index.js';
-import { db, schema } from '../db/index.js';
-import { eq, and } from 'drizzle-orm';
 
 export interface TrendListing {
   ilanId: string;
@@ -96,12 +94,19 @@ export async function scrapeTrendListings(): Promise<TrendListing[]> {
   return listings;
 }
 
+/**
+ * Save trends to local SQLite DB (for local dev only).
+ * On Vercel, the API route handles saving to Supabase directly.
+ */
 export async function saveTrendsToDb(listings: TrendListing[]): Promise<number[]> {
+  // Lazy import — SQLite only available in local dev
+  const { db, schema } = await import('../db/index.js');
+  const { eq, and } = await import('drizzle-orm');
+
   const today = new Date().toISOString().split('T')[0];
   const savedIds: number[] = [];
 
   for (const listing of listings) {
-    // Check if already exists for today
     const existing = db.select()
       .from(schema.trends)
       .where(and(

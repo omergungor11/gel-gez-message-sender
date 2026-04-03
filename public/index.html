@@ -64,25 +64,6 @@
     /* Layout */
     .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
-    /* Stats Cards */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 30px;
-    }
-    .stat-card {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid var(--border);
-    }
-    .stat-card .label { color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
-    .stat-card .value { font-size: 32px; font-weight: 700; }
-    .stat-card .value.accent { color: var(--accent); }
-    .stat-card .value.success { color: var(--success); }
-    .stat-card .value.warning { color: var(--warning); }
-
     /* Tabs */
     .tabs {
       display: flex;
@@ -251,6 +232,87 @@
       border-radius: 8px;
       font-family: inherit;
     }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 640px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 18px; font-weight: 600; }
+    .modal-close {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 24px; cursor: pointer; padding: 4px 8px;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 24px; }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .field-group { margin-bottom: 16px; }
+    .field-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .field-group input, .field-group textarea, .field-group select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .field-group input:focus, .field-group textarea:focus, .field-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .field-group textarea { resize: vertical; min-height: 80px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-readonly {
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 8px 0;
+    }
+    .modal-img {
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -267,26 +329,6 @@
     </div>
 
     <div class="container">
-      <!-- Stats -->
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-card">
-          <div class="label">Bugunun Trend Ilanlari</div>
-          <div class="value accent" id="statTrends">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">WhatsApp Gonderildi</div>
-          <div class="value success" id="statWhatsapp">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Sosyal Medya Icerigi</div>
-          <div class="value warning" id="statSocial">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">Toplam Ilan</div>
-          <div class="value" id="statTotal">-</div>
-        </div>
-      </div>
-
       <!-- Tabs -->
       <div class="tabs">
         <button class="tab active" data-tab="trends">Trend Ilanlar</button>
@@ -301,6 +343,7 @@
     </div>
 
     <div id="toast" class="toast" style="display:none;"></div>
+    <div id="modalContainer"></div>
   </div>
 
   <script>
@@ -310,13 +353,11 @@
 
     // Init
     document.getElementById('dateFilter').value = currentDate;
-    loadStats();
     loadTab('trends');
 
     // Event Listeners
     document.getElementById('dateFilter').addEventListener('change', (e) => {
       currentDate = e.target.value;
-      loadStats();
       loadTab(currentTab);
     });
 
@@ -328,7 +369,6 @@
         const res = await fetch(`${API}/api/pipeline/run`, { method: 'POST' });
         const data = await res.json();
         showToast(`Pipeline tamamlandi! ${data.result.trendsFound} trend, ${data.result.whatsappSent} WA`, 'success');
-        loadStats();
         loadTab(currentTab);
       } catch (e) {
         showToast('Pipeline hatasi: ' + e.message, 'error');
@@ -346,20 +386,6 @@
         loadTab(currentTab);
       });
     });
-
-    // Load Stats
-    async function loadStats() {
-      try {
-        const res = await fetch(`${API}/api/pipeline/stats`);
-        const data = await res.json();
-        document.getElementById('statTrends').textContent = data.trends.today;
-        document.getElementById('statWhatsapp').textContent = data.whatsapp.sent;
-        document.getElementById('statSocial').textContent = data.social.today;
-        document.getElementById('statTotal').textContent = data.trends.total;
-      } catch (e) {
-        console.error('Stats load error:', e);
-      }
-    }
 
     // Load Tab Content
     async function loadTab(tab) {
@@ -425,7 +451,7 @@
                       </span>
                     </td>
                     <td>
-                      <button class="btn btn-secondary btn-sm" onclick="enrichTrend(${t.id})" ${t.telefon ? 'disabled' : ''}>Detay</button>
+                      <button class="btn btn-secondary btn-sm" onclick="openTrendDetail(${t.id})">Detay</button>
                       <button class="btn btn-primary btn-sm" onclick="sendWhatsApp(${t.id})" ${t.whatsapp_durumu === 'gonderildi' ? 'disabled' : ''}>WA</button>
                       <button class="btn btn-secondary btn-sm" onclick="generateSocial(${t.id})">Gorsel</button>
                     </td>
@@ -543,7 +569,7 @@
         const data = await res.json();
         showToast(data.success ? 'WhatsApp gonderildi!' : 'Gonderilemedi: ' + data.error, data.success ? 'success' : 'error');
         loadTab('trends');
-        loadStats();
+
       } catch (e) {
         showToast('Hata: ' + e.message, 'error');
       }
@@ -554,7 +580,7 @@
       try {
         await fetch(`${API}/api/trends/${id}/social`, { method: 'POST' });
         showToast('Sosyal medya icerigi uretildi!', 'success');
-        loadStats();
+
       } catch (e) {
         showToast('Hata: ' + e.message, 'error');
       }
@@ -604,7 +630,7 @@
         }
         showToast(`${sent}/${pending.length} mesaj gonderildi!`, 'success');
         loadTab('trends');
-        loadStats();
+
       } catch (e) {
         showToast('Hata: ' + e.message, 'error');
       }
@@ -619,7 +645,7 @@
           await fetch(`${API}/api/trends/${t.id}/social`, { method: 'POST' });
         }
         showToast(`${data.trends.length} ilan icin gorsel uretildi!`, 'success');
-        loadStats();
+
       } catch (e) {
         showToast('Hata: ' + e.message, 'error');
       }
@@ -677,6 +703,145 @@
         loadTab('social');
       } catch (e) {
         showToast('Toplu paylasim hatasi: ' + e.message, 'error');
+      }
+    }
+
+    // Detail Modal
+    async function openTrendDetail(id) {
+      const mc = document.getElementById('modalContainer');
+      mc.innerHTML = '<div class="modal-overlay"><div class="loading"><div class="spinner"></div></div></div>';
+
+      try {
+        const res = await fetch(`${API}/api/trends/${id}`);
+        const data = await res.json();
+        const t = data.trend;
+
+        mc.innerHTML = `
+          <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+            <div class="modal">
+              <div class="modal-header">
+                <h2>Ilan Detay / Duzenle</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+              </div>
+              <div class="modal-body">
+                ${t.image_url ? `<img class="modal-img" src="${t.image_url}" onerror="this.style.display='none'">` : ''}
+
+                <div class="field-group">
+                  <label>Baslik</label>
+                  <input id="ed_baslik" value="${esc(t.baslik || '')}" />
+                </div>
+
+                <div class="field-row">
+                  <div class="field-group">
+                    <label>Fiyat</label>
+                    <input id="ed_fiyat" value="${esc(t.fiyat || '')}" />
+                  </div>
+                  <div class="field-group">
+                    <label>Konum</label>
+                    <input id="ed_konum" value="${esc(t.konum || '')}" />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-group">
+                    <label>Ilan Sahibi</label>
+                    <input id="ed_ilan_sahibi" value="${esc(t.ilan_sahibi || '')}" />
+                  </div>
+                  <div class="field-group">
+                    <label>Magaza</label>
+                    <input id="ed_magaza" value="${esc(t.magaza || '')}" />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-group">
+                    <label>Telefon</label>
+                    <input id="ed_telefon" value="${esc(t.telefon || '')}" />
+                  </div>
+                  <div class="field-group">
+                    <label>WhatsApp No</label>
+                    <input id="ed_whatsapp_no" value="${esc(t.whatsapp_no || '')}" />
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <label>Aciklama</label>
+                  <textarea id="ed_aciklama" rows="3">${esc(t.aciklama || '')}</textarea>
+                </div>
+
+                <div class="field-group">
+                  <label>URL</label>
+                  <div class="field-readonly">
+                    <a href="${t.url}" target="_blank" style="color:var(--accent);">${t.url}</a>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <div class="field-group">
+                    <label>WhatsApp Durumu</label>
+                    <select id="ed_whatsapp_durumu">
+                      <option value="bekliyor" ${t.whatsapp_durumu === 'bekliyor' ? 'selected' : ''}>Bekliyor</option>
+                      <option value="gonderildi" ${t.whatsapp_durumu === 'gonderildi' ? 'selected' : ''}>Gonderildi</option>
+                      <option value="hata" ${t.whatsapp_durumu === 'hata' ? 'selected' : ''}>Hata</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label>Tarih</label>
+                    <div class="field-readonly">${t.tarih} | ID: ${t.id}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="enrichTrend(${t.id}).then(()=>{closeModal();openTrendDetail(${t.id})})" ${t.telefon ? 'disabled' : ''}>Detay Cek</button>
+                <button class="btn btn-secondary" onclick="closeModal()">Iptal</button>
+                <button class="btn btn-primary" onclick="saveTrendEdit(${t.id})">Kaydet</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        mc.innerHTML = '';
+        showToast('Detay yuklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    function esc(str) {
+      return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function closeModal() {
+      document.getElementById('modalContainer').innerHTML = '';
+    }
+
+    async function saveTrendEdit(id) {
+      const fields = {
+        baslik: document.getElementById('ed_baslik').value,
+        fiyat: document.getElementById('ed_fiyat').value,
+        konum: document.getElementById('ed_konum').value,
+        ilan_sahibi: document.getElementById('ed_ilan_sahibi').value,
+        magaza: document.getElementById('ed_magaza').value,
+        telefon: document.getElementById('ed_telefon').value,
+        whatsapp_no: document.getElementById('ed_whatsapp_no').value,
+        aciklama: document.getElementById('ed_aciklama').value,
+        whatsapp_durumu: document.getElementById('ed_whatsapp_durumu').value,
+      };
+
+      try {
+        const res = await fetch(`${API}/api/trends/${id}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fields),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Kaydedildi!', 'success');
+          closeModal();
+          loadTab('trends');
+        } else {
+          showToast('Hata: ' + (data.error || 'Bilinmeyen'), 'error');
+        }
+      } catch (e) {
+        showToast('Kaydetme hatasi: ' + e.message, 'error');
       }
     }
 

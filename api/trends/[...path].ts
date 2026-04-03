@@ -46,6 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json(result);
     }
 
+    // POST /api/trends/:id/update
+    if (action === 'update' && req.method === 'POST') {
+      await db.updateTrend(id, req.body);
+      const trend = await db.getTrendById(id);
+      return res.json({ success: true, trend });
+    }
+
     // POST /api/trends/:id/social
     if (action === 'social' && req.method === 'POST') {
       const trend = await db.getTrendById(id);

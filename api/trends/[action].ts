@@ -1,44 +1,38 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from '../../src/db/supabase.js';
-import { getAllTemplateIds, TEMPLATES } from '../../src/social/templates/theme-system.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const pathArr = Array.isArray(req.query.path) ? req.query.path : [req.query.path as string];
+  const action = req.query.action as string;
 
   try {
-    // GET /api/trends/templates/list
-    if (pathArr[0] === 'templates') {
-      const templates = getAllTemplateIds().map(id => {
-        const t = TEMPLATES[id];
-        return { id: t.id, name: t.name, variant: t.variant, accent: t.accent, bgPrimary: t.bgPrimary };
-      });
-      return res.json({ templates });
+    // GET /api/trends/list?date=YYYY-MM-DD
+    if (action === 'list') {
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const trends = await db.getTrendsByDate(date);
+      return res.json({ date, count: trends.length, trends });
     }
 
-    // Routes with numeric ID: /api/trends/:id[/action]
-    const id = parseInt(pathArr[0]);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid path' });
-
-    const action = pathArr[1]; // enrich, whatsapp, social, or undefined
-
-    // GET /api/trends/:id
-    if (!action && req.method === 'GET') {
+    // GET /api/trends/detail?id=X
+    if (action === 'detail' && req.method === 'GET') {
+      const id = parseInt(req.query.id as string);
       const trend = await db.getTrendById(id);
       if (!trend) return res.status(404).json({ error: 'Not found' });
       const posts = await db.getSocialPostsByTrendId(id);
       return res.json({ trend, socialPosts: posts });
     }
 
-    // POST /api/trends/:id/enrich
+    // POST /api/trends/enrich?id=X
     if (action === 'enrich' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
       const { enrichTrendWithDetails } = await import('../../src/scraper/detailScraper.js');
       await enrichTrendWithDetails(id);
       const trend = await db.getTrendById(id);
       return res.json({ success: true, trend });
     }
 
-    // POST /api/trends/:id/whatsapp
+    // POST /api/trends/whatsapp?id=X
     if (action === 'whatsapp' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
       const trend = await db.getTrendById(id);
       if (!trend) return res.status(404).json({ error: 'Not found' });
       const { sendTrendNotification } = await import('../../src/whatsapp/sender.js');
@@ -46,15 +40,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json(result);
     }
 
-    // POST /api/trends/:id/update
-    if (action === 'update' && req.method === 'POST') {
-      await db.updateTrend(id, req.body);
-      const trend = await db.getTrendById(id);
-      return res.json({ success: true, trend });
-    }
-
-    // POST /api/trends/:id/social
+    // POST /api/trends/social?id=X
     if (action === 'social' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
       const trend = await db.getTrendById(id);
       if (!trend) return res.status(404).json({ error: 'Not found' });
       const { generateSocialContent } = await import('../../src/social/generator.js');
@@ -63,7 +51,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, content });
     }
 
-    return res.status(404).json({ error: 'Not found' });
+    // POST /api/trends/update?id=X
+    if (action === 'update' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
+      await db.updateTrend(id, req.body);
+      const trend = await db.getTrendById(id);
+      return res.json({ success: true, trend });
+    }
+
+    // GET /api/trends/templates
+    if (action === 'templates') {
+      const { getAllTemplateIds, TEMPLATES } = await import('../../src/social/templates/theme-system.js');
+      const templates = getAllTemplateIds().map(id => {
+        const t = TEMPLATES[id];
+        return { id: t.id, name: t.name, variant: t.variant, accent: t.accent, bgPrimary: t.bgPrimary };
+      });
+      return res.json({ templates });
+    }
+
+    return res.status(404).json({ error: 'Unknown action: ' + action });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

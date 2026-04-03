@@ -399,7 +399,7 @@
 
     async function loadTrends(container) {
       try {
-        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
         const data = await res.json();
 
         if (data.trends.length === 0) {
@@ -555,7 +555,7 @@
     // Actions
     async function enrichTrend(id) {
       try {
-        await fetch(`${API}/api/trends/${id}/enrich`, { method: 'POST' });
+        await fetch(`${API}/api/trends/enrich?id=${id}`, { method: 'POST' });
         showToast('Detaylar cekildi!', 'success');
         loadTab('trends');
       } catch (e) {
@@ -565,7 +565,7 @@
 
     async function sendWhatsApp(id) {
       try {
-        const res = await fetch(`${API}/api/trends/${id}/whatsapp`, { method: 'POST' });
+        const res = await fetch(`${API}/api/trends/whatsapp?id=${id}`, { method: 'POST' });
         const data = await res.json();
         showToast(data.success ? 'WhatsApp gonderildi!' : 'Gonderilemedi: ' + data.error, data.success ? 'success' : 'error');
         loadTab('trends');
@@ -578,7 +578,7 @@
     async function generateSocial(id) {
       showToast('Gorsel uretiliyor, lutfen bekleyin...', 'success');
       try {
-        await fetch(`${API}/api/trends/${id}/social`, { method: 'POST' });
+        await fetch(`${API}/api/trends/social?id=${id}`, { method: 'POST' });
         showToast('Sosyal medya icerigi uretildi!', 'success');
 
       } catch (e) {
@@ -588,7 +588,7 @@
 
     async function copyCaption(id) {
       try {
-        const res = await fetch(`${API}/api/social/posts/${id}`);
+        const res = await fetch(`${API}/api/social/post?id=${id}`);
         const post = await res.json();
         const text = (post.caption || '') + '\n\n' + (post.hashtags || '');
         await navigator.clipboard.writeText(text);
@@ -602,11 +602,11 @@
     async function bulkEnrich() {
       showToast('Tum detaylar cekilyor...', 'success');
       try {
-        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
         const data = await res.json();
         const noDetail = data.trends.filter(t => !t.telefon);
         for (const t of noDetail) {
-          await fetch(`${API}/api/trends/${t.id}/enrich`, { method: 'POST' });
+          await fetch(`${API}/api/trends/enrich?id=${t.id}`, { method: 'POST' });
         }
         showToast(`${noDetail.length} ilan detayi cekildi!`, 'success');
         loadTab('trends');
@@ -619,12 +619,12 @@
       if (!confirm('Tum bekleyen ilanlara WhatsApp mesaji gonderilecek. Devam?')) return;
       showToast('Toplu WA gonderiliyor...', 'success');
       try {
-        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
         const data = await res.json();
         const pending = data.trends.filter(t => t.whatsapp_durumu !== 'gonderildi' && t.telefon);
         let sent = 0;
         for (const t of pending) {
-          const r = await fetch(`${API}/api/trends/${t.id}/whatsapp`, { method: 'POST' });
+          const r = await fetch(`${API}/api/trends/whatsapp?id=${t.id}`, { method: 'POST' });
           const d = await r.json();
           if (d.success) sent++;
         }
@@ -639,10 +639,10 @@
     async function bulkSocial() {
       showToast('Toplu gorsel uretiliyor...', 'success');
       try {
-        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
         const data = await res.json();
         for (const t of data.trends) {
-          await fetch(`${API}/api/trends/${t.id}/social`, { method: 'POST' });
+          await fetch(`${API}/api/trends/social?id=${t.id}`, { method: 'POST' });
         }
         showToast(`${data.trends.length} ilan icin gorsel uretildi!`, 'success');
 
@@ -653,7 +653,7 @@
 
     async function exportCSV() {
       try {
-        const res = await fetch(`${API}/api/trends?date=${currentDate}`);
+        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
         const data = await res.json();
         const headers = ['ID', 'Baslik', 'Fiyat', 'Konum', 'Ilan Sahibi', 'Magaza', 'Telefon', 'WhatsApp', 'WA Durumu', 'URL'];
         const rows = data.trends.map(t => [
@@ -678,7 +678,7 @@
     async function publishSingle(trendId) {
       showToast('Instagram + Facebook\'a paylasiliyor...', 'success');
       try {
-        const res = await fetch(`${API}/api/social/publish/${trendId}`, { method: 'POST' });
+        const res = await fetch(`${API}/api/social/publish?trendId=${trendId}`, { method: 'POST' });
         const data = await res.json();
         const ok = data.results?.filter(r => r.success).length || 0;
         const fail = data.results?.filter(r => !r.success).length || 0;
@@ -712,7 +712,7 @@
       mc.innerHTML = '<div class="modal-overlay"><div class="loading"><div class="spinner"></div></div></div>';
 
       try {
-        const res = await fetch(`${API}/api/trends/${id}`);
+        const res = await fetch(`${API}/api/trends/detail?id=${id}`);
         const data = await res.json();
         const t = data.trend;
 
@@ -827,7 +827,7 @@
       };
 
       try {
-        const res = await fetch(`${API}/api/trends/${id}/update`, {
+        const res = await fetch(`${API}/api/trends/update?id=${id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(fields),

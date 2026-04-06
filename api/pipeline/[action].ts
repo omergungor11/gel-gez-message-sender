@@ -72,6 +72,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, enriched, remaining, total: missing.length });
     }
 
+    // POST /api/pipeline/wa-test — send test WhatsApp to yourself
+    if (action === 'wa-test' && req.method === 'POST') {
+      const testNumber = req.query.to as string || '+905338205149';
+      const { getWhatsAppClient, formatWhatsAppNumber } = await import('../../src/whatsapp/client.js');
+      const { config } = await import('../../src/config/index.js');
+
+      const to = formatWhatsAppNumber(testNumber);
+      const client = getWhatsAppClient();
+
+      const result = await client.messages.create({
+        from: config.TWILIO_WHATSAPP_NUMBER,
+        to,
+        body: `🧪 GelGezGor Test Mesaji\n\nBu bir test mesajidir.\nTarih: ${new Date().toLocaleString('tr-TR')}\n\nSistem calisiyor! ✅`,
+      });
+
+      await db.insertLog({ action: 'wa-test', status: 'success', message: `Test → ${to} (SID: ${result.sid})` });
+      return res.json({ success: true, sid: result.sid, to });
+    }
+
+    // POST /api/pipeline/wa-send-all — send WA to all enriched trends (batch 3)
+    if (action === 'wa-send-all' && req.method === 'POST') {
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const trends = await db.getTrendsByDate(date);
+      const pending = trends.filter((t: any) => t.telefon && t.whatsapp_durumu !== 'gonderildi');
+
+      if (pending.length === 0) {
+        return res.json({ success: true, sent: 0, remaining: 0, message: 'Gonderilecek ilan yok' });
+      }
+
+      const batch = pending.slice(0, 3); // 3 per call for 10s safety
+      let sent = 0;
+      const { sendTrendNotification } = await import('../../src/whatsapp/sender.js');
+
+      for (const t of batch) {
+        const result = await sendTrendNotification(t);
+        if (result.success) sent++;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
+      const remaining = pending.length - sent;
+      await db.insertLog({ action: 'wa-batch', status: 'success', message: `${sent} sent, ${remaining} remaining` });
+      return res.json({ success: true, sent, remaining, total: pending.length });
+    }
+
     return res.status(404).json({ error: 'Unknown action' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

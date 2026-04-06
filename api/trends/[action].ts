@@ -30,11 +30,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, trend });
     }
 
-    // POST /api/trends/whatsapp?id=X
+    // POST /api/trends/whatsapp?id=X[&testTo=+905338205149]
     if (action === 'whatsapp' && req.method === 'POST') {
       const id = parseInt(req.query.id as string);
       const trend = await db.getTrendById(id);
       if (!trend) return res.status(404).json({ error: 'Not found' });
+
+      // Sandbox mode: override recipient with test number
+      const testTo = req.query.testTo as string;
+      if (testTo) {
+        trend.whatsapp_no = testTo;
+        trend.telefon = testTo;
+      }
+
       const { sendTrendNotification } = await import('../../src/whatsapp/sender.js');
       const result = await sendTrendNotification(trend);
       return res.json(result);

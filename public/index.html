@@ -364,11 +364,28 @@
     document.getElementById('runPipeline').addEventListener('click', async () => {
       const btn = document.getElementById('runPipeline');
       btn.disabled = true;
-      btn.textContent = '⏳ Calisiyor...';
       try {
+        // Step 1: Scrape
+        btn.textContent = '⏳ Scrape...';
         const res = await fetch(`${API}/api/pipeline/run`, { method: 'POST' });
         const data = await res.json();
-        showToast(`Pipeline tamamlandi! ${data.result.trendsFound} trend, ${data.result.whatsappSent} WA`, 'success');
+        showToast(`${data.result.trendsFound} trend bulundu, detaylar cekilyor...`, 'success');
+        loadTab(currentTab);
+
+        // Step 2: Enrich all (batch 5 at a time, repeat until done)
+        let remaining = 999;
+        let totalEnriched = 0;
+        while (remaining > 0) {
+          btn.textContent = `⏳ Detay (${totalEnriched}...)`;
+          const enrichRes = await fetch(`${API}/api/pipeline/enrich-all?date=${currentDate}`, { method: 'POST' });
+          const enrichData = await enrichRes.json();
+          totalEnriched += enrichData.enriched || 0;
+          remaining = enrichData.remaining || 0;
+          if (enrichData.enriched === 0) break;
+          loadTab(currentTab);
+        }
+
+        showToast(`Tamamlandi! ${data.result.trendsFound} trend, ${totalEnriched} detay cekildi`, 'success');
         loadTab(currentTab);
       } catch (e) {
         showToast('Pipeline hatasi: ' + e.message, 'error');
@@ -603,15 +620,20 @@
 
     // Bulk Operations
     async function bulkEnrich() {
-      showToast('Tum detaylar cekilyor...', 'success');
+      showToast('Tum detaylar cekilyor (5\'li gruplar)...', 'success');
       try {
-        const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
-        const data = await res.json();
-        const noDetail = data.trends.filter(t => !t.telefon);
-        for (const t of noDetail) {
-          await fetch(`${API}/api/trends/enrich?id=${t.id}`, { method: 'POST' });
+        let remaining = 999;
+        let totalEnriched = 0;
+        while (remaining > 0) {
+          const res = await fetch(`${API}/api/pipeline/enrich-all?date=${currentDate}`, { method: 'POST' });
+          const data = await res.json();
+          totalEnriched += data.enriched || 0;
+          remaining = data.remaining || 0;
+          if (data.enriched === 0) break;
+          showToast(`${totalEnriched} detay cekildi, ${remaining} kaldi...`, 'success');
+          loadTab('trends');
         }
-        showToast(`${noDetail.length} ilan detayi cekildi!`, 'success');
+        showToast(`Tamamlandi! ${totalEnriched} ilan detayi cekildi`, 'success');
         loadTab('trends');
       } catch (e) {
         showToast('Hata: ' + e.message, 'error');

@@ -35,6 +35,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, result: { trendsFound: listings.length, trendsSaved: saved, whatsappSent: 0, socialGenerated: 0 } });
     }
 
+    // POST /api/pipeline/enrich-all — enrich trends missing details (batch, max 5 per call)
+    if (action === 'enrich-all' && req.method === 'POST') {
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const trends = await db.getTrendsByDate(date);
+      const missing = trends.filter((t: any) => !t.telefon);
+
+      if (missing.length === 0) {
+        return res.json({ success: true, enriched: 0, remaining: 0, message: 'Tum ilanlar zaten zenginlestirilmis' });
+      }
+
+      // Process max 5 per call to stay under 10s timeout
+      const batch = missing.slice(0, 5);
+      let enriched = 0;
+
+      for (const t of batch) {
+        try {
+          const { scrapeListingDetail } = await import('../../src/scraper/detailScraper.js');
+          const detail = await scrapeListingDetail(t.url);
+          await db.updateTrend(t.id, {
+            telefon: detail.telefon,
+            whatsapp_no: detail.whatsappNo,
+            ilan_sahibi: detail.ilanSahibi,
+            magaza: detail.magaza,
+            aciklama: detail.aciklama,
+            opi_images: JSON.stringify(detail.images),
+          });
+          enriched++;
+        } catch (e: any) {
+          console.error(`Enrich #${t.id} failed:`, e.message);
+        }
+      }
+
+      const remaining = missing.length - enriched;
+      await db.insertLog({ action: 'enrich-batch', status: 'success', message: `${enriched} enriched, ${remaining} remaining` });
+      return res.json({ success: true, enriched, remaining, total: missing.length });
+    }
+
     return res.status(404).json({ error: 'Unknown action' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

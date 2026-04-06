@@ -34,6 +34,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: results.every(r => r.success), results });
     }
 
+    // POST /api/social/publish-all
+    if (action === 'publish-all' && req.method === 'POST') {
+      const date = (req.body?.date as string) || new Date().toISOString().split('T')[0];
+      const { publishAllTrends } = await import('../../src/social/publisher/index.js');
+      const resultsMap = await publishAllTrends(date);
+      let published = 0, failed = 0;
+      for (const [, results] of resultsMap) {
+        if (results.some(r => r.success)) published++;
+        else failed++;
+      }
+      return res.json({ success: true, summary: { total: resultsMap.size, published, failed } });
+    }
+
     return res.status(404).json({ error: 'Unknown action: ' + action });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

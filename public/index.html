@@ -400,6 +400,7 @@
     async function loadTrends(container) {
       try {
         const res = await fetch(`${API}/api/trends/list?date=${currentDate}`);
+        if (!res.ok) throw new Error(`API ${res.status}`);
         const data = await res.json();
 
         if (data.trends.length === 0) {
@@ -469,6 +470,7 @@
     async function loadSocial(container) {
       try {
         const res = await fetch(`${API}/api/social/posts?date=${currentDate}`);
+        if (!res.ok) throw new Error(`API ${res.status}`);
         const data = await res.json();
 
         // Check Meta API status
@@ -529,6 +531,7 @@
     async function loadLogs(container) {
       try {
         const res = await fetch(`${API}/api/pipeline/logs?limit=50`);
+        if (!res.ok) throw new Error(`API ${res.status}`);
         const data = await res.json();
 
         if (data.logs.length === 0) {

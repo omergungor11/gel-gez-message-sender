@@ -72,7 +72,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, enriched, remaining, total: missing.length });
     }
 
-    // POST /api/pipeline/wa-test — send test WhatsApp to yourself
+    // GET /api/pipeline/meta-wa-status — check Meta WA account
+    if (action === 'meta-wa-status') {
+      const { getMetaWAStatus } = await import('../../src/whatsapp/meta-wa-client.js');
+      const status = await getMetaWAStatus();
+      return res.json(status);
+    }
+
+    // POST /api/pipeline/meta-wa-test — send test via Meta WA Cloud API
+    if (action === 'meta-wa-test' && req.method === 'POST') {
+      const testNumber = req.query.to as string || '+905338205149';
+      const useTemplate = req.query.template as string;
+      const { sendMetaWAText, sendMetaWATemplate } = await import('../../src/whatsapp/meta-wa-client.js');
+
+      let result;
+      if (useTemplate) {
+        // Use approved template (e.g., "hello_world")
+        result = await sendMetaWATemplate(testNumber, useTemplate, 'en_US');
+      } else {
+        // Plain text (only works if within 24h window)
+        const text = `🧪 GelGezGor Meta WA Test\n\nTarih: ${new Date().toLocaleString('tr-TR')}\n\nMeta Cloud API calisiyor! ✅`;
+        result = await sendMetaWAText(testNumber, text);
+      }
+
+      if (result.success) {
+        await db.insertLog({ action: 'meta-wa-test', status: 'success', message: `Sent to ${testNumber} (id: ${result.messageId})` });
+      } else {
+        await db.insertLog({ action: 'meta-wa-test', status: 'error', message: result.error || 'unknown' });
+      }
+      return res.json(result);
+    }
+
+    // POST /api/pipeline/wa-test — send test WhatsApp to yourself (Twilio sandbox)
     if (action === 'wa-test' && req.method === 'POST') {
       const testNumber = req.query.to as string || '+905338205149';
       const { getWhatsAppClient, formatWhatsAppNumber } = await import('../../src/whatsapp/client.js');

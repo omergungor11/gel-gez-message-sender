@@ -28,6 +28,11 @@ const envSchema = z.object({
   FACEBOOK_PAGE_ACCESS_TOKEN: z.string().default(''),
   PUBLIC_BASE_URL: z.string().default(''),
 
+  // Meta WhatsApp Cloud API (own business number)
+  META_WA_PHONE_NUMBER_ID: z.string().default(''),
+  META_WA_ACCESS_TOKEN: z.string().default(''),
+  META_WA_BUSINESS_ACCOUNT_ID: z.string().default(''),
+
   // Pipeline
   CRON_SCHEDULE: z.string().default('0 9,15 * * *'),
   DRY_RUN: z.string().default('true'),

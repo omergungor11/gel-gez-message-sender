@@ -332,7 +332,8 @@
       <!-- Tabs -->
       <div class="tabs">
         <button class="tab active" data-tab="trends">Trend Ilanlar</button>
-        <button class="tab" data-tab="social">Sosyal Medya</button>
+        <button class="tab" data-tab="creator">Sosyal Medya Üretici</button>
+        <button class="tab" data-tab="social">Üretilen İçerikler</button>
         <button class="tab" data-tab="logs">Pipeline Loglar</button>
       </div>
 
@@ -410,6 +411,7 @@
       container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Yukleniyor...</p></div>';
 
       if (tab === 'trends') await loadTrends(container);
+      else if (tab === 'creator') await loadCreator(container);
       else if (tab === 'social') await loadSocial(container);
       else if (tab === 'logs') await loadLogs(container);
     }
@@ -543,6 +545,168 @@
       } catch (e) {
         container.innerHTML = `<div class="loading"><p>Hata: ${e.message}</p></div>`;
       }
+    }
+
+    async function loadCreator(container) {
+      container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Yukleniyor...</p></div>';
+      try {
+        const [trendsRes, layoutsRes] = await Promise.all([
+          fetch(`${API}/api/trends/list?date=${currentDate}`),
+          fetch(`${API}/api/trends/layouts`),
+        ]);
+        if (!trendsRes.ok) throw new Error(`Trends API ${trendsRes.status}`);
+        if (!layoutsRes.ok) throw new Error(`Layouts API ${layoutsRes.status}`);
+
+        const trendsData = await trendsRes.json();
+        const layoutsData = await layoutsRes.json();
+
+        container.innerHTML = `
+          <div style="margin-bottom:20px;">
+            <div class="field-group" style="max-width:500px;">
+              <label>Ilan Seç</label>
+              <select id="creatorTrendSelect" onchange="creatorSelectTrend(this.value)">
+                <option value="">— Ilan seçin —</option>
+                ${trendsData.trends.map(t =>
+                  `<option value="${t.id}">#${t.id} — ${(t.baslik||'').substring(0,60)}</option>`
+                ).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div id="creatorSelectedTrend" style="display:none;margin-bottom:20px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;">
+          </div>
+
+          <h3 style="margin-bottom:16px;font-size:16px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;">5 Instagram Layout Tasarımı</h3>
+
+          <div class="social-grid" id="creatorLayouts">
+            ${layoutsData.layouts.map((l, i) => `
+              <div class="social-card" id="creator-card-${l.id}">
+                <div style="aspect-ratio:1;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;position:relative;">
+                  <div id="creator-img-${l.id}">
+                    <div style="text-align:center;">
+                      <div style="font-size:40px;font-weight:700;color:var(--accent);margin-bottom:8px;">${String(i+1).padStart(2,'0')}</div>
+                      <div style="font-size:13px;">Önizleme için Üret</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="social-card-body">
+                  <div class="platform">${l.name}</div>
+                  <div class="caption">${l.description}</div>
+                </div>
+                <div class="social-card-actions">
+                  <button class="btn btn-primary btn-sm" id="creator-btn-${l.id}" onclick="creatorGenerateOne('${l.id}')" disabled>Üret</button>
+                  <button class="btn btn-secondary btn-sm" id="creator-download-${l.id}" style="display:none;">İndir</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top:20px;text-align:center;">
+            <button class="btn btn-primary" id="creatorGenerateAll" onclick="creatorGenerateAll()" disabled>
+              Tüm 5 Layout'u Üret
+            </button>
+          </div>
+        `;
+      } catch (e) {
+        container.innerHTML = `<div class="loading"><p>Hata: ${e.message}</p></div>`;
+      }
+    }
+
+    let creatorCurrentTrendId = null;
+
+    async function creatorSelectTrend(id) {
+      if (!id) {
+        creatorCurrentTrendId = null;
+        document.getElementById('creatorSelectedTrend').style.display = 'none';
+        document.querySelectorAll('[id^="creator-btn-"]').forEach(b => b.disabled = true);
+        document.getElementById('creatorGenerateAll').disabled = true;
+        return;
+      }
+
+      creatorCurrentTrendId = parseInt(id);
+      try {
+        const res = await fetch(`${API}/api/trends/detail?id=${id}`);
+        const data = await res.json();
+        const t = data.trend;
+
+        const box = document.getElementById('creatorSelectedTrend');
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div style="display:flex;gap:16px;align-items:center;">
+            ${t.image_url ? `<img src="${t.image_url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;">` : ''}
+            <div style="flex:1;">
+              <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${t.baslik}</div>
+              <div style="color:var(--text-muted);font-size:13px;">
+                ${t.fiyat || '-'} • ${t.konum || '-'} • ${t.ilan_sahibi || 'Ilan sahibi bilinmiyor'}
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.querySelectorAll('[id^="creator-btn-"]').forEach(b => b.disabled = false);
+        document.getElementById('creatorGenerateAll').disabled = false;
+      } catch (e) {
+        showToast('Ilan yüklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    async function creatorGenerateOne(layoutId) {
+      if (!creatorCurrentTrendId) return;
+
+      const btn = document.getElementById(`creator-btn-${layoutId}`);
+      const imgBox = document.getElementById(`creator-img-${layoutId}`);
+      const downloadBtn = document.getElementById(`creator-download-${layoutId}`);
+
+      btn.disabled = true;
+      btn.textContent = 'Üretiliyor...';
+      imgBox.innerHTML = '<div class="spinner"></div>';
+
+      try {
+        const res = await fetch(`${API}/api/trends/layout?id=${creatorCurrentTrendId}&layout=${layoutId}`, { method: 'POST' });
+        if (!res.ok) throw new Error(`API ${res.status}`);
+        const data = await res.json();
+
+        const filename = data.imagePath.split('/').pop();
+        const imgUrl = `/output/${filename}?t=${Date.now()}`;
+
+        imgBox.parentElement.innerHTML = `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+
+        downloadBtn.style.display = 'inline-block';
+        downloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = imgUrl;
+          a.download = filename;
+          a.click();
+        };
+
+        btn.textContent = 'Yeniden Üret';
+        btn.disabled = false;
+        showToast(`${layoutId} layout hazır!`, 'success');
+      } catch (e) {
+        btn.textContent = 'Üret';
+        btn.disabled = false;
+        imgBox.innerHTML = `<div style="color:var(--accent);">Hata: ${e.message}</div>`;
+        showToast('Üretim hatası: ' + e.message, 'error');
+      }
+    }
+
+    async function creatorGenerateAll() {
+      if (!creatorCurrentTrendId) return;
+
+      const btn = document.getElementById('creatorGenerateAll');
+      btn.disabled = true;
+      btn.textContent = 'Tüm 5 layout üretiliyor...';
+
+      const layouts = ['classic', 'split', 'magazine', 'polaroid', 'minimal'];
+      for (const l of layouts) {
+        await creatorGenerateOne(l);
+      }
+
+      btn.textContent = 'Tamamlandı';
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Tüm 5 Layout\'u Üret';
+      }, 2000);
     }
 
     async function loadLogs(container) {

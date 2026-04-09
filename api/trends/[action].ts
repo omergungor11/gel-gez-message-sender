@@ -59,6 +59,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.json({ success: true, content });
     }
 
+    // POST /api/trends/layout?id=X&layout=classic|split|magazine|polaroid|minimal
+    if (action === 'layout' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
+      const layoutId = (req.query.layout as string) || 'classic';
+      const trend = await db.getTrendById(id);
+      if (!trend) return res.status(404).json({ error: 'Not found' });
+
+      const { generateLayout, LAYOUTS } = await import('../../src/social/layouts.js');
+      if (!(layoutId in LAYOUTS)) {
+        return res.status(400).json({ error: `Unknown layout: ${layoutId}` });
+      }
+
+      const imagePath = await generateLayout(layoutId as any, trend);
+      return res.json({ success: true, layoutId, imagePath });
+    }
+
+    // POST /api/trends/all-layouts?id=X — generate all 5 layouts
+    if (action === 'all-layouts' && req.method === 'POST') {
+      const id = parseInt(req.query.id as string);
+      const trend = await db.getTrendById(id);
+      if (!trend) return res.status(404).json({ error: 'Not found' });
+
+      const { generateAllLayouts } = await import('../../src/social/layouts.js');
+      const paths = await generateAllLayouts(trend);
+      return res.json({ success: true, layouts: paths });
+    }
+
+    // GET /api/trends/layouts — list available layouts
+    if (action === 'layouts') {
+      const { LAYOUTS } = await import('../../src/social/layouts.js');
+      const layouts = Object.entries(LAYOUTS).map(([id, l]) => ({
+        id,
+        name: l.name,
+        description: l.description,
+      }));
+      return res.json({ layouts });
+    }
+
     // POST /api/trends/update?id=X
     if (action === 'update' && req.method === 'POST') {
       const id = parseInt(req.query.id as string);
